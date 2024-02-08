@@ -26,3 +26,13 @@ class RegistrationSerializer(serializers.ModelSerializer):
         instance.save()
 
         return instance
+
+
+class LoginSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(
+        style={'input_type': 'password'}
+    )
+
+    class Meta:
+        model = UserModel
+        fields = ('username', 'password')
