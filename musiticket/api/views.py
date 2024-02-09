@@ -1,3 +1,5 @@
+from django.http import HttpResponseRedirect
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny
 from rest_framework.generics import CreateAPIView
@@ -19,9 +21,11 @@ def get_tokens_for_user(user):
         'access': str(refresh.access_token),
     }
 
+
 # Create your views here.
 class RegistrationView(CreateAPIView):
-    permission_classes = (AllowAny,)
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [AllowAny]
     serializer_class = RegistrationSerializer
 
     def post(self, request, *args, **kwargs):
@@ -33,21 +37,21 @@ class RegistrationView(CreateAPIView):
 
 
 class LoginView(CreateAPIView):
-    permission_classes = (AllowAny,)
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [AllowAny]
     serializer_class = LoginSerializer
 
     def post(self, request, *args, **kwargs):
-        data = request.data
         response = Response()
         username = request.data['username']
         password = request.data['password']
 
         user = UserModel.objects.filter(username=username).first()
 
-        if not user.check_password(password):
-            raise AuthenticationFailed("Incorrect password")
-
         if user is not None:
+            if not user.check_password(password):
+                raise AuthenticationFailed("Incorrect password")
+
             user_data = get_tokens_for_user(user)
             response.set_cookie(
                 key=settings.SIMPLE_JWT['AUTH_COOKIE'],
@@ -67,3 +71,9 @@ class LoginView(CreateAPIView):
                 {"Invalid": "Invalid username or password!!"},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+
+def logout(request):
+    response = HttpResponseRedirect('/api/login/')
+    response.delete_cookie('access_token')
+    return response

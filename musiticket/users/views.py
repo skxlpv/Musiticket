@@ -17,8 +17,6 @@ class UserListView(generics.ListAPIView):
 
 
 class UserView(APIView):
-    authentication_classes = [TokenAuthentication]
-
     def get(self, request):
         token = request.COOKIES.get('access_token')
 
