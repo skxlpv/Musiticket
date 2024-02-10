@@ -1,19 +1,19 @@
-from django.contrib.auth import authenticate, login
-from django.http import HttpResponseRedirect
+from django.contrib.auth import authenticate, login, logout
+from django.http import JsonResponse, HttpResponseRedirect
+from django.shortcuts import redirect
+from django.urls.base import reverse
 from rest_framework.authentication import SessionAuthentication
-from rest_framework.exceptions import AuthenticationFailed
-from rest_framework.permissions import AllowAny
-from rest_framework.generics import CreateAPIView, get_object_or_404
+from rest_framework.decorators import permission_classes, api_view
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.generics import CreateAPIView
 from rest_framework.response import Response
 from rest_framework import status
-from django.middleware import csrf
 from rest_framework.authtoken.models import Token
 from rest_framework.views import APIView
 
+from api.models import BlackListedToken
 from api.serializers import RegistrationSerializer, LoginSerializer
-from musiticket import settings
 from users.models import UserModel
-from users.serializers import UserSerializer
 
 
 # Create your views here.
@@ -51,45 +51,29 @@ class LoginView(APIView):
                 login(request, user)
                 print("IsAuthenticated", user.is_authenticated)
 
-            token, _ = Token.objects.get_or_create(user=user)
-            return Response({'token': token.key},
-                            status=status.HTTP_200_OK)
+                Token.objects.filter(user=user).delete()
+
+                token = Token.objects.create(user=user)
+
+                response = Response({'token': token.key}, status=status.HTTP_200_OK)
+                response.set_cookie('refresh_token', token.key, httponly=True)
+                return response
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def logout_view(request):
+    try:
+        refresh_token = request.COOKIES.get('refresh_token')
 
-    # def post(self, request, *args, **kwargs):
-    #     response = Response()
-    #     username = request.data['username']
-    #     password = request.data['password']
-    #
-    #     user = UserModel.objects.filter(username=username).first()
-    #
-    #     if user is not None:
-    #         if not user.check_password(password):
-    #             raise AuthenticationFailed("Incorrect password")
-    #
-    #         user_data = get_tokens_for_user(user)
-    #         response.set_cookie(
-    #             key=settings.SIMPLE_JWT['AUTH_COOKIE'],
-    #             value=user_data["access"],
-    #             expires=settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'],
-    #             secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
-    #             httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
-    #             samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
-    #         )
-    #
-    #         csrf.get_token(request)
-    #         response.data = {"Success": "Login successfully", "id": user.id}
-    #
-    #         return response
-    #     else:
-    #         return Response(
-    #             {"Invalid": "Invalid username or password!!"},
-    #             status=status.HTTP_404_NOT_FOUND
-    #         )
+        if not BlackListedToken.objects.filter(token=refresh_token).first():
+            BlackListedToken.objects.create(token=refresh_token, user=request.user)
 
+        logout(request)
 
-def logout(request):
-    response = HttpResponseRedirect('/api/login/')
-    response.delete_cookie('access_token')
-    return response
+        response = HttpResponseRedirect(reverse('home'))
+        response.delete_cookie("refresh_token")
+
+        return response
+    except:
+        return Response("No refresh token was provided")
