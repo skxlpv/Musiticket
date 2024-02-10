@@ -1,3 +1,4 @@
+from django.contrib.auth import authenticate
 from rest_framework import serializers
 
 from users.models import UserModel
@@ -29,10 +30,14 @@ class RegistrationSerializer(serializers.ModelSerializer):
 
 
 class LoginSerializer(serializers.ModelSerializer):
+    username = serializers.CharField()
     password = serializers.CharField(
         style={'input_type': 'password'}
     )
 
+    def validate_username(self, value):
+        return value
+
     class Meta:
         model = UserModel
-        fields = ('username', 'password')
+        fields = ('id', 'username', 'password')
