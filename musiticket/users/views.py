@@ -17,9 +17,17 @@ class UserListView(generics.ListAPIView):
     serializer_class = UserSerializer
 
 
-class UserView(APIView):
+class MyProfileView(APIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [SessionAuthentication, TokenAuthentication]
 
     def get(self, request):
-        return Response({"message": "passed for {}".format(request.user.email)})
+        username = request.user.username
+        email = request.user.email
+        first_name = request.user.first_name
+        last_name = request.user.last_name
+
+        return Response({"username": username,
+                         "email": email,
+                         "first_name": first_name,
+                         "last_name": last_name})
