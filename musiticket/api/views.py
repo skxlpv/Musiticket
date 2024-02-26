@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 from api.models import BlackListedToken
 from api.serializers import RegistrationSerializer, LoginSerializer
 from users.models import UserModel
+from django.core.exceptions import ObjectDoesNotExist
 
 
 # Create your views here.
@@ -36,6 +37,8 @@ class RegistrationView(CreateAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+from django.http import HttpResponse
+
 class LoginView(APIView):
     authentication_classes = [SessionAuthentication]
     permission_classes = [AllowAny]
@@ -48,16 +51,22 @@ class LoginView(APIView):
             # new_data = serializer.data
             if serializer.data:
                 user = authenticate(username=request.data['username'], password=request.data['password'])
-                login(request, user)
-                print("IsAuthenticated", user.is_authenticated)
+                if user is not None:
+                    login(request, user)
+                    print("IsAuthenticated", user.is_authenticated)
 
-                Token.objects.filter(user=user).delete()
+                    Token.objects.filter(user=user).delete()
 
-                token = Token.objects.create(user=user)
+                    token = Token.objects.create(user=user)
 
-                response = Response({'token': token.key}, status=status.HTTP_200_OK)
-                response.set_cookie('refresh_token', token.key, httponly=True)
-                return response
+                    response = Response({'token': token.key}, status=status.HTTP_200_OK)
+                    response.set_cookie('refresh_token', token.key, httponly=True)
+                    return response
+                else:
+                    return Response({"Invalid username or password. Please try again"}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                return Response({"Invalid input data. Please try again"}, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 @api_view(['GET'])
@@ -75,5 +84,5 @@ def logout_view(request):
         response.delete_cookie("refresh_token")
 
         return response
-    except:
+    except ObjectDoesNotExist:
         return Response("No refresh token was provided")
